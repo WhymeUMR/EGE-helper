@@ -98,6 +98,59 @@ def subjects_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+WEEKLY_HOURS = [10, 20, 30, 40]
+
+
+def hours_keyboard() -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"⏱ {h} ч/нед",
+                callback_data=f"onb:hours:{h}",
+                style=PRIMARY,
+            )
+            for h in WEEKLY_HOURS[:2]
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"🔥 {h} ч/нед",
+                callback_data=f"onb:hours:{h}",
+                style=PRIMARY,
+            )
+            for h in WEEKLY_HOURS[2:]
+        ],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="onb:back_subjects")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def calibration_keyboard(subjects: list[str]) -> InlineKeyboardMarkup:
+    labels = {key: (label, emoji) for key, label, emoji in SUBJECTS}
+    rows: list[list[InlineKeyboardButton]] = []
+    for key in subjects:
+        if key not in labels:
+            continue
+        label, emoji = labels[key]
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"📝 Пробник: {emoji} {label}",
+                    callback_data=f"onb:calib:start:{key}",
+                    style=SUCCESS,
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="⏭ Пропустить",
+                callback_data="onb:calib:skip",
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[

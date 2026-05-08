@@ -16,4 +16,5 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
     grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
     subjects: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    weekly_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
     onboarding_completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
