@@ -14,6 +14,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True, nullable=False)
+    first_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    username: Mapped[str | None] = mapped_column(String(32), nullable=True)
     grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
     subjects: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
     weekly_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
