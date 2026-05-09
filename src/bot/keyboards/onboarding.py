@@ -19,6 +19,9 @@ PRIMARY = "primary"
 SUCCESS = "success"
 DANGER = "danger"
 
+# Минимум: рус + математика + 1 профильный — это база ЕГЭ для поступления.
+# Меньше 3-х предметов по факту = недосбор для большинства вузов.
+MIN_SUBJECTS = 3
 # Реалистичный потолок: больше 5 предметов разом — это уже не подготовка,
 # а распыление. Кап мягкий: пользователь видит «🔒» и поясняющий тост.
 MAX_SUBJECTS = 5
@@ -99,11 +102,11 @@ def subjects_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
         rows.append(pair)
 
     selected_count = len(selected)
-    can_finish = selected_count >= 2
+    can_finish = selected_count >= MIN_SUBJECTS
     done_text = (
         f"✨ Готово ({selected_count})"
         if can_finish
-        else f"🔒 Выбери ещё {2 - selected_count}"
+        else f"🔒 Выбери ещё {MIN_SUBJECTS - selected_count}"
     )
     rows.append(
         [
@@ -178,22 +181,33 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🎯 Тренировка", callback_data="menu:train", style=SUCCESS
+                    text="🎯 Решать задачи",
+                    callback_data="menu:practice",
+                    style=SUCCESS,
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📊 Статистика",
+                    callback_data="menu:stats",
+                    style=PRIMARY,
                 ),
                 InlineKeyboardButton(
-                    text="📊 Статистика", callback_data="menu:stats", style=PRIMARY
+                    text="📚 Материалы",
+                    callback_data="menu:materials",
+                    style=PRIMARY,
                 ),
             ],
             [
                 InlineKeyboardButton(
-                    text="🗓 Мой план", callback_data="menu:plan", style=PRIMARY
+                    text="⚙️ Настройки",
+                    callback_data="menu:settings",
                 ),
                 InlineKeyboardButton(
-                    text="⚙️ Настройки", callback_data="menu:settings"
+                    text="📝 Пробный вариант",
+                    callback_data="menu:mock",
+                    style=PRIMARY,
                 ),
-            ],
-            [
-                InlineKeyboardButton(text="❓ Помощь", callback_data="menu:help"),
             ],
         ]
     )

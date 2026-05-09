@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from bot.db.models import User
 from bot.keyboards.onboarding import (
     MAX_SUBJECTS,
+    MIN_SUBJECTS,
     SUBJECTS,
     WEEKLY_HOURS,
     about_back_keyboard,
@@ -54,6 +55,11 @@ STEP_LABELS = {
     "calibration": "🎯 Пробник",
 }
 
+# ФИПИ официально не объявляет «единый день», основная волна стартует
+# в 20-х числах мая — берём 23 мая как опорную точку для отсчёта.
+EGE_MONTH = 5
+EGE_DAY = 23
+
 try:
     _MOSCOW_TZ: ZoneInfo | None = ZoneInfo("Europe/Moscow")
 except ZoneInfoNotFoundError:  # pragma: no cover - tzdata missing
@@ -74,10 +80,13 @@ def _display_name(tg_user: TelegramUser | None, fallback: str = "друг") -> s
     return _safe_name(tg_user.first_name, fallback=fallback)
 
 
+def _now_msk() -> datetime:
+    return datetime.now(_MOSCOW_TZ) if _MOSCOW_TZ else datetime.now()
+
+
 def _greeting(name: str) -> str:
     """Time-aware greeting in MSK; falls back to local time if tzdata is missing."""
-    now = datetime.now(_MOSCOW_TZ) if _MOSCOW_TZ else datetime.now()
-    hour = now.hour
+    hour = _now_msk().hour
     if 5 <= hour < 12:
         prefix = "☀️ Доброе утро"
     elif 12 <= hour < 17:
@@ -87,6 +96,35 @@ def _greeting(name: str) -> str:
     else:
         prefix = "🌙 Доброй ночи"
     return f"{prefix}, <b>{name}</b>!"
+
+
+def _decline_days(n: int) -> str:
+    """Russian noun agreement for «день»: 1 день, 2 дня, 5 дней."""
+    n = abs(int(n))
+    if 11 <= n % 100 <= 14:
+        return "дней"
+    last = n % 10
+    if last == 1:
+        return "день"
+    if 2 <= last <= 4:
+        return "дня"
+    return "дней"
+
+
+def _days_to_ege(grade: int | None, today: date | None = None) -> int:
+    """Days until the user's actual ЕГЭ.
+
+    Approximation: основная волна ЕГЭ стартует ~23 мая. Для 11-классников —
+    ближайшая такая дата; для 10-классников — ещё через год (они сдают в
+    конце 11 класса). Если grade неизвестен, считаем как для 11-классников.
+    """
+    today = today or _now_msk().date()
+    target = date(today.year, EGE_MONTH, EGE_DAY)
+    if today > target:
+        target = date(today.year + 1, EGE_MONTH, EGE_DAY)
+    if grade == 10:
+        target = date(target.year + 1, EGE_MONTH, EGE_DAY)
+    return (target - today).days
 
 
 def _progress_bar(step: int, total: int = TOTAL_ONBOARDING_STEPS) -> str:
@@ -109,7 +147,7 @@ def _onboarding_step_for(user: User) -> str:
     """
     if user.weekly_hours is not None:
         return "calibration"
-    if len(user.subjects or []) >= 2:
+    if len(user.subjects or []) >= MIN_SUBJECTS:
         return "hours"
     if user.grade is not None:
         return "subjects"
@@ -170,17 +208,17 @@ def _subjects_text(user: User, name: str) -> str:
             f"⚡ Достигнут максимум <b>{MAX_SUBJECTS}</b> предметов. "
             "Чтобы поменять — сними отметку с другого."
         )
-    elif selected_count >= 2:
+    elif selected_count >= MIN_SUBJECTS:
         hint = "✅ Можно нажать <b>«Готово»</b>, либо добавить ещё."
     else:
-        need = 2 - selected_count
+        need = MIN_SUBJECTS - selected_count
         hint = f"⚠️ {name}, выбери ещё <b>{need}</b>, чтобы продолжить."
 
     return (
         f"{_step_header(2, 'Предметы', '📚')}\n"
         f"<i>{DIVIDER}</i>\n\n"
         "Отметь все предметы, которые <b>сдаёшь</b> "
-        f"(<b>2–{MAX_SUBJECTS}</b>).\n"
+        f"(<b>{MIN_SUBJECTS}–{MAX_SUBJECTS}</b>).\n"
         "Нажми ещё раз, чтобы снять отметку.\n"
         f"{chosen_block}\n"
         f"{hint}"
@@ -208,9 +246,7 @@ def _calibration_text(subjects: list[str], name: str) -> str:
         "по одному из выбранных предметов. По его результатам я точнее "
         "настрою сложность задач и план подготовки.\n\n"
         "Если пропустишь — ничего страшного, я разберусь по ходу занятий, "
-        "просто это займёт пару недель. ⏳\n\n"
-        "<i>⚠️ Пока пробник в разработке — кнопки ниже зарезервированы, "
-        "но дадут результат после ближайшего апдейта.</i>"
+        "просто это займёт пару недель. ⏳"
     )
 
 
@@ -239,9 +275,7 @@ def _settings_text(user: User, name: str) -> str:
         f"<b>{name}</b>, твой текущий профиль:\n\n"
         f"👤 <b>Класс:</b> {grade}\n"
         f"📚 <b>Предметы:</b> {subjects_str}\n"
-        f"⏱ <b>Темп:</b> {hours_str}\n\n"
-        "<i>Пока единственный настраиваемый пункт — пройти онбординг "
-        "заново, если хочешь поменять профиль целиком.</i>"
+        f"⏱ <b>Темп:</b> {hours_str}"
     )
 
 
@@ -264,13 +298,27 @@ def _main_menu_text(user: User, name: str) -> str:
         subjects_str = "—"
     hours_str = f"{user.weekly_hours} ч/нед" if user.weekly_hours else "—"
 
+    # Серия и дневная цель завязаны на трекер тренировок, которого пока нет.
+    # Показываем «—» вместо мок-данных — заполнится, когда подключим SM-2.
+    streak_str = "—"
+    daily_goal_str = "—"
+
+    if user.grade is None:
+        days_left_str = "—"
+    else:
+        days_left = _days_to_ege(user.grade)
+        days_left_str = f"{days_left} {_decline_days(days_left)}"
+
     return (
         f"{_greeting(name)}\n"
         f"<i>{DIVIDER}</i>\n\n"
         f"👤 <b>Класс:</b> {grade}\n"
         f"📚 <b>Предметы:</b> {subjects_str}\n"
         f"⏱ <b>Темп:</b> {hours_str}\n\n"
-        "🎯 Что делаем дальше? 👇"
+        f"🔥 <b>Серия:</b> {streak_str}\n"
+        f"📅 <b>До ЕГЭ:</b> {days_left_str}\n"
+        f"🎯 <b>Цель на сегодня:</b> {daily_goal_str}\n\n"
+        "🚀 Что делаем дальше? 👇"
     )
 
 
@@ -504,9 +552,10 @@ async def onboarding_subjects_done(
 
     async with db_session_factory() as session:
         user = await _get_or_create_user(session, tg_user)
-        if len(set(user.subjects or [])) < 2:
+        if len(set(user.subjects or [])) < MIN_SUBJECTS:
             await callback.answer(
-                "⚠️ Нужно выбрать минимум 2 предмета", show_alert=True
+                f"⚠️ Нужно выбрать минимум {MIN_SUBJECTS} предмета",
+                show_alert=True,
             )
             return
         current_hours = user.weekly_hours
@@ -752,21 +801,21 @@ async def menu_home(
 
 
 _MENU_STUBS: dict[str, tuple[str, str]] = {
-    "train": (
-        "🎯 Тренировка",
+    "practice": (
+        "🎯 Решать задачи",
         "Скоро здесь будут адаптивные задачи по SM-2.",
     ),
     "stats": (
         "📊 Статистика",
         "Скоро увидишь свой прогресс, стрики и сильные/слабые темы.",
     ),
-    "plan": (
-        "🗓 Мой план",
-        "Персональное расписание подготовки — уже скоро.",
+    "materials": (
+        "📚 Материалы",
+        "Конспекты, формулы и шпаргалки — уже скоро.",
     ),
-    "help": (
-        "❓ Помощь",
-        "FAQ и связь с автором — в работе.",
+    "mock": (
+        "📝 Пробный вариант",
+        "Полноценный пробный вариант ЕГЭ с автопроверкой — уже скоро.",
     ),
 }
 
