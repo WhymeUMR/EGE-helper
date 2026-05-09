@@ -1,7 +1,7 @@
 <div align="center">
 
 <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-<img src="https://img.shields.io/badge/aiogram-3.x-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" />
+<img src="https://img.shields.io/badge/aiogram-3.27-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" />
 <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
 <img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
 <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" />
@@ -12,53 +12,56 @@
 
 *Умное расписание · Автопроверка ответов · Аналитика прогресса · Open Source*
 
-[Попробовать](#) · [Документация](#) · [Сообщить о баге](../../issues) · [Предложить фичу](../../issues)
+[Сообщить о баге](../../issues) · [Предложить фичу](../../issues)
 
 </div>
 
 ---
 
-## 🤔 Зачем это нужно?
-
-Большинство инструментов для подготовки к ЕГЭ решают не ту проблему — они дают тебе задачи, но не говорят **когда** и **что** решать. В итоге ты либо зубришь то, что и так знаешь, либо избегаешь сложные темы.
-
-EGE Helper работает иначе. Он использует алгоритм **SM-2** (тот же что в Anki) — отслеживает твои результаты по каждому типу заданий и сам решает что показать сегодня. Сложные темы появляются чаще, освоенные — реже. Никакого ручного планирования.
+> ⚠️ **Статус:** ранний этап разработки (`v0.1`). Сейчас работают онбординг, профиль с обратным отсчётом до ЕГЭ, главное меню как дашборд, настройки и сброс прогресса. Алгоритм SM-2, парсинг задач и MiniApp — в роадмапе.
 
 ---
 
-## ✨ Возможности
+## 🤔 Зачем это нужно?
 
-### 📊 Личный кабинет
-- Баннер с обратным отсчётом до ЕГЭ
-- Прогресс-бар на основе реальных результатов
-- Стрик и статистика по дням
-- Дедлайны по активным заданиям
+Большинство инструментов для подготовки к ЕГЭ решают не ту проблему — они дают тебе задачи, но не говорят **когда** и **что** решать. В итоге ты либо ботаешь, что и так знаешь, либо избегаешь сложные темы.
 
-### 🧠 Умное расписание (SM-2)
-- Алгоритм интервального повторения адаптирует нагрузку под тебя
-- Автопроверка ответов в части 1
-- Трекинг времени решения каждой задачи
-- Самооценка для части 2 с показом эталонного ответа
+EGE Helper будет работать иначе. Он использует алгоритм **SM-2** (тот же что в Anki) — отслеживает твои результаты по каждому типу заданий и сам решает что показать сегодня. Сложные темы появляются чаще, освоенные — реже. Никакого ручного планирования.
 
-### 📚 База заданий
-- Задания напрямую с **СдамГИА** (решу.егэ) через [`sdamgia-api`](https://github.com/anijackich/sdamgia-api)
-- Кэширование в собственной БД — независимость от апстрима
-- Фильтрация по номеру задания и типу
-- Поддержка предметов: профильная математика, русский язык, информатика
+---
 
-### 🎮 MiniApp
-- Полноценный интерфейс для решения задач прямо в Telegram
-- Выбор конкретного номера задания для целенаправленной отработки
-- История решений и разборы
+## ✨ Что уже работает
 
-### 📅 Персональное расписание
-- Вводишь сколько часов в неделю готов тратить
-- Бот сам считает количество задач в день (~17 мин/задача)
-- SM-2 распределяет задачи по типам внутри дня
+**Онбординг и профиль**
+- 🚀 Полный поток: класс (10/11) → предметы (3–5) → темп (10–40 ч/нед) → опциональный пробник
+- ⏱ Прогресс-бар шагов (`▰▰▱`) и явные «Шаг 1 из 3»
+- ▶️ **Resume** — `/start` посреди онбординга вернёт на тот же шаг с опцией «Продолжить» / «Начать заново»
+- 🔄 **Сброс** — `/reset` или Settings → «Пройти заново», с подтверждением
+- 🔒 Кап на предметы (макс 5) с визуальным `🔒` и тостом-блокировкой
 
-### 🏆 Калибровка
-- Опциональный пробный вариант в начале для точного старта
-- Без калибровки — SM-2 сам разберётся за первые недели
+**Главное меню как дашборд**
+- 👤 Профиль: класс, предметы (эмодзи + count), темп
+- 📅 **Обратный отсчёт до ЕГЭ** — считаем от сегодня до ~23 мая для 11кл, +год для 10кл, с правильным склонением (1 день / 2 дня / 5 дней)
+- 🔥 Серия и 🎯 Цель на сегодня — пока плейсхолдеры (заполнятся вместе с SM-2)
+- 5 действий: Решать задачи / Статистика / Материалы / Настройки / Пробный вариант (Settings — рабочий экран, остальное пока тосты)
+
+**Персонализация**
+- 👋 Обращение по имени — берём из Telegram-апдейта, синкаем `first_name` / `username` в Postgres при `/start`
+- 🌤 Time-aware greeting (Доброе утро / день / вечер / ночь) по МСК
+- ✅ HTML-escape имени — никаких инъекций даже если в нике `<script>`
+
+**Технологическое**
+- 🎨 Цветные кнопки (Bot API 9.4): `primary` / `success` / `danger`
+- 💬 HTML-разметка в сообщениях, аккуратные эмодзи и заголовки
+- 📊 Счётчик `/start` в Redis с TTL 24 часа
+- 🪵 Цветные логи через [`rich`](https://github.com/Textualize/rich) с трейсбэками
+- 🐳 Docker Compose — бот + Postgres + Redis одной командой
+
+---
+
+## 📚 Поддерживаемые предметы
+
+Профильная математика, русский язык, информатика, физика, химия, биология, история, обществознание, английский язык, литература, география.
 
 ---
 
@@ -66,80 +69,118 @@ EGE Helper работает иначе. Он использует алгорит
 
 | Слой | Технологии |
 |---|---|
-| Бот | `aiogram 3` |
-| База данных | `PostgreSQL 16` + `SQLAlchemy async` + `Alembic` |
-| Кэш / FSM | `Redis 7` |
-| Планировщик | `APScheduler` |
-| Парсинг заданий | `sdamgia-api` |
-| Графика | `Pillow` |
+| Бот | `aiogram 3.27` (Bot API 9.4) |
+| База данных | `PostgreSQL 16` + `SQLAlchemy 2.x async` + `asyncpg` |
+| Кэш / счётчики | `Redis 7` |
+| Конфигурация | `pydantic-settings` |
+| Логи | `rich` |
 | Инфраструктура | `Docker` + `docker-compose` |
-| CI/CD | `GitHub Actions` |
+
+Ещё не подключено (в роадмапе): `Alembic`, `APScheduler`, `Pillow`, `sdamgia-api`.
 
 ---
 
 ## 🚀 Быстрый старт
 
 ### Требования
-- Python 3.11+
 - Docker & docker-compose
 - Telegram Bot Token ([получить у @BotFather](https://t.me/BotFather))
 
 ### Установка
 
 ```bash
-# Клонируй репозиторий
-git clone https://github.com/yourusername/ege-tracker-bot.git
-cd ege-tracker-bot
+git clone https://github.com/yourusername/EGE-helper.git
+cd EGE-helper
 
-# Скопируй конфиг
+# Создай .env по образцу ниже
 cp .env.example .env
-
-# Заполни переменные окружения
 nano .env
 
-# Запусти
-docker-compose up -d
+# Запусти всё разом
+docker compose up -d --build
+```
+
+После пересборки контейнера бот сам:
+1. подключится к Postgres и применит `Base.metadata.create_all` (миграций пока нет);
+2. проверит Redis;
+3. начнёт `polling`.
+
+Логи смотри командой:
+```bash
+docker compose logs -f bot
 ```
 
 ### Переменные окружения
 
+`.env` в корне проекта:
+
 ```env
-BOT_TOKEN=your_telegram_bot_token
-DATABASE_URL=postgresql+asyncpg://user:password@db:5432/ege_tracker
-REDIS_URL=redis://redis:6379/0
+BOT_TOKEN=123456:your_telegram_bot_token
+
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=ege_helper
+POSTGRES_USER=ege_user
+POSTGRES_PASSWORD=ege_password
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=0
 ```
+
+> При запуске вне Docker замени `POSTGRES_HOST=localhost` и `POSTGRES_PORT=5433` (см. проброс портов в `docker-compose.yml`).
 
 ---
 
 ## 📁 Структура проекта
 
+Послойная архитектура — однонаправленные зависимости, никаких циклов:
+
+```
+handlers → screens, services, texts, keyboards, utils, catalog
+screens  → texts, keyboards, services
+services → db, catalog
+texts    → catalog, utils, db.models
+keyboards → catalog
+utils    → (ничего)
+catalog  → (ничего)
+```
+
 ```
 .
-├── .dockerignore
-├── .env.example
-├── CONTRIBUTING.md
 ├── docker-compose.yml
 ├── Dockerfile
-├── LICENSE
 ├── pyproject.toml
+├── CONTRIBUTING.md
+├── LICENSE
 ├── README.md
-└── src/
-    └── bot/
-        ├── __init__.py
-        ├── config.py
-        ├── main.py
-        ├── middlewares.py
-        ├── db/
-        │   ├── __init__.py
-        │   ├── postgres.py
-        │   └── redis_client.py
-        ├── handlers/
-        │   ├── __init__.py
-        │   └── start.py
-        ├── keyboards/
-        │   └── __init__.py
-        └── services/
-            └── __init__.py
+└── src/bot/
+    ├── main.py                 # точка входа, startup/shutdown
+    ├── config.py               # настройки через pydantic-settings
+    ├── logging_config.py       # rich-логгер
+    ├── middlewares.py          # прокидывает Redis и SessionFactory
+    ├── catalog.py              # SUBJECTS, MIN/MAX_SUBJECTS, WEEKLY_HOURS, GRADE_LABELS
+    ├── texts.py                # text builders (welcome/grade/subjects/hours/calibration/resume/settings/main_menu/reset_confirm/ABOUT)
+    ├── screens.py              # step_screen / initial_state_screen — склейка text + keyboard по state
+    ├── utils/
+    │   ├── dates.py            # now_msk, greeting, days_to_ege, decline_days
+    │   ├── names.py            # safe_name, display_name (HTML-escape)
+    │   └── progress.py         # progress_bar (▰▰▱), step_header
+    ├── services/
+    │   └── users.py            # get_or_create_user, wipe_onboarding, onboarding_step_for
+    ├── db/
+    │   ├── models.py           # SQLAlchemy User
+    │   ├── postgres.py         # async engine + create_all
+    │   └── redis_client.py
+    ├── keyboards/
+    │   ├── onboarding.py       # welcome/grade/subjects/hours/calibration/about_back/resume
+    │   └── menu.py             # main_menu/settings/reset_confirm
+    └── handlers/
+        ├── __init__.py         # агрегирует 4 router'а
+        ├── onboarding.py       # /start + onb:* (кроме reset/resume)
+        ├── resume.py           # onb:resume:continue/restart
+        ├── reset.py            # /reset + onb:reset:start/confirm/cancel
+        └── menu.py             # menu:settings/home + catch-all stub
 ```
 
 ---
@@ -147,24 +188,39 @@ REDIS_URL=redis://redis:6379/0
 ## 🗺 Роадмап
 
 ### v0.1 — Скелет
-- [ ] Онбординг (класс → предметы → расписание → калибровка)
-- [ ] Регистрация пользователей
-- [ ] База задач по трём предметам
-- [ ] Ежедневная выдача заданий
+- [x] Онбординг: класс → предметы (3–5) → темп
+- [x] Resume + reset онбординга
+- [x] Регистрация пользователей с синком имени
+- [x] Главное меню как дашборд + обратный отсчёт до ЕГЭ
+- [x] Настройки с просмотром профиля и сбросом
+- [x] Послойная архитектура (catalog / texts / screens / services / utils)
+- [ ] Расписание подготовки (часов в неделю → задач в день)
+- [ ] Калибровка (опциональный пробный вариант)
 
 ### v0.2 — SM-2
-- [ ] Полная реализация алгоритма SM-2
-- [ ] Автопроверка ответов + трекинг времени
-- [ ] Формирование ДЗ из очереди SM-2
+- [ ] Реализация алгоритма SM-2
+- [ ] Автопроверка ответов части 1
+- [ ] Трекинг времени решения
+- [ ] Самооценка для части 2
+- [ ] Заполнение «🔥 Серия» и «🎯 Цель на сегодня» в главном меню
 
-### v0.3 — Интерфейс
+### v0.3 — Контент
+- [ ] Парсинг заданий через [`sdamgia-api`](https://github.com/anijackich/sdamgia-api)
+- [ ] Кэширование задач в собственной БД
+- [ ] Фильтрация по номеру и типу задания
+- [ ] Экран «📚 Материалы» (конспекты, формулы)
+
+### v0.4 — Интерфейс
 - [ ] Личный кабинет с баннером (Pillow)
-- [ ] Стрик и статистика
+- [ ] Полноценный экран «📊 Статистика» (топ слабых тем, тренд)
 - [ ] MiniApp для решения задач
+- [ ] Напоминания через APScheduler
+- [ ] Полный пробный вариант ЕГЭ за раз
 
-### v0.4 — Полировка
-- [ ] Все темы ЕГЭ по трём предметам
-- [ ] Источники для подготовки по каждому типу
+### v0.5 — Релиз
+- [ ] Alembic-миграции (заменить `Base.metadata.create_all`)
+- [ ] Все темы ЕГЭ по основным предметам
+- [ ] Тесты на хендлеры и сервисы
 - [ ] Публичный деплой
 
 ---
@@ -191,7 +247,7 @@ REDIS_URL=redis://redis:6379/0
 
 ## ⚠️ Дисклеймер
 
-Задания парсятся с [СдамГИА](https://ege.sdamgia.ru/) через неофициальный API. Проект не аффилирован с СдамГИА, Яндексом или ФИПИ. Используй ответственно.
+В будущем задания будут парситься с [СдамГИА](https://ege.sdamgia.ru/) через неофициальный API. Проект не аффилирован с СдамГИА, Яндексом или ФИПИ. Используй ответственно.
 
 ---
 
