@@ -26,6 +26,6 @@ def setup_logging(level: int = logging.INFO) -> None:
         force=True,
     )
 
-    # Quiet down libraries that like to spam at INFO/DEBUG.
+    # глушим разговорчивые библиотеки — на INFO/DEBUG они валят простыни
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)

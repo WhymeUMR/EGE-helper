@@ -1,32 +1,18 @@
+"""Инлайн-клавиатуры для экранов онбординга
+
+Каждая функция возвращает свежий InlineKeyboardMarkup — кэшировать
+нельзя, потому что выбор предметов и текущее значение часов меняют
+разметку.
+"""
+
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-SUBJECTS: list[tuple[str, str, str]] = [
-    ("math", "Профильная математика", "📐"),
-    ("russian", "Русский язык", "📖"),
-    ("informatics", "Информатика", "💻"),
-    ("physics", "Физика", "🧲"),
-    ("chemistry", "Химия", "⚗️"),
-    ("biology", "Биология", "🧬"),
-    ("history", "История", "🏛"),
-    ("social", "Обществознание", "⚖️"),
-    ("english", "Английский язык", "🇬🇧"),
-    ("literature", "Литература", "📚"),
-    ("geography", "География", "🌍"),
-]
+from bot.catalog import MAX_SUBJECTS, MIN_SUBJECTS, SUBJECTS, WEEKLY_HOURS
 
-# Inline button styles introduced in Bot API 9.4 (aiogram >= 3.27).
+# стили инлайн-кнопок из Bot API 9.4 (aiogram >= 3.27)
 PRIMARY = "primary"
 SUCCESS = "success"
 DANGER = "danger"
-
-# Минимум: рус + математика + 1 профильный — это база ЕГЭ для поступления.
-# Меньше 3-х предметов по факту = недосбор для большинства вузов.
-MIN_SUBJECTS = 3
-# Реалистичный потолок: больше 5 предметов разом — это уже не подготовка,
-# а распыление. Кап мягкий: пользователь видит «🔒» и поясняющий тост.
-MAX_SUBJECTS = 5
-
-WEEKLY_HOURS = [10, 20, 30, 40]
 
 
 def welcome_keyboard() -> InlineKeyboardMarkup:
@@ -81,8 +67,8 @@ def subjects_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
             mark = "✅"
             style = SUCCESS
         elif at_max:
-            # Визуально «залочены» — клик всё равно отработает, но
-            # хендлер откажет с тостом, и юзер сразу понимает почему.
+            # визуально «залочены» — клик всё равно дойдёт, но хендлер
+            # откажет тостом, и юзер сразу понимает почему
             mark = "🔒"
             style = None
         else:
@@ -176,43 +162,6 @@ def calibration_keyboard(subjects: list[str]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def main_menu_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🎯 Решать задачи",
-                    callback_data="menu:practice",
-                    style=SUCCESS,
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="📊 Статистика",
-                    callback_data="menu:stats",
-                    style=PRIMARY,
-                ),
-                InlineKeyboardButton(
-                    text="📚 Материалы",
-                    callback_data="menu:materials",
-                    style=PRIMARY,
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="⚙️ Настройки",
-                    callback_data="menu:settings",
-                ),
-                InlineKeyboardButton(
-                    text="📝 Пробный вариант",
-                    callback_data="menu:mock",
-                    style=PRIMARY,
-                ),
-            ],
-        ]
-    )
-
-
 def about_back_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -241,46 +190,6 @@ def resume_keyboard() -> InlineKeyboardMarkup:
                     text="🔄 Начать заново",
                     callback_data="onb:resume:restart",
                 )
-            ],
-        ]
-    )
-
-
-def settings_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="🔄 Пройти онбординг заново",
-                    callback_data="onb:reset:start",
-                    style=DANGER,
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🏠 В главное меню",
-                    callback_data="menu:home",
-                )
-            ],
-        ]
-    )
-
-
-def reset_confirm_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="✅ Да, начать заново",
-                    callback_data="onb:reset:confirm",
-                    style=DANGER,
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="↩ Отмена",
-                    callback_data="onb:reset:cancel",
-                ),
             ],
         ]
     )
