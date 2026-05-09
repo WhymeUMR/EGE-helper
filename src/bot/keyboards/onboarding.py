@@ -19,6 +19,12 @@ PRIMARY = "primary"
 SUCCESS = "success"
 DANGER = "danger"
 
+# Реалистичный потолок: больше 5 предметов разом — это уже не подготовка,
+# а распыление. Кап мягкий: пользователь видит «🔒» и поясняющий тост.
+MAX_SUBJECTS = 5
+
+WEEKLY_HOURS = [10, 20, 30, 40]
+
 
 def welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
@@ -51,6 +57,12 @@ def grade_keyboard() -> InlineKeyboardMarkup:
                     text="🎓 11 класс", callback_data="onb:grade:11", style=PRIMARY
                 ),
             ],
+            [
+                InlineKeyboardButton(
+                    text="⬅️ Назад",
+                    callback_data="onb:back_welcome",
+                ),
+            ],
         ]
     )
 
@@ -58,15 +70,25 @@ def grade_keyboard() -> InlineKeyboardMarkup:
 def subjects_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
     pair: list[InlineKeyboardButton] = []
+    at_max = len(selected) >= MAX_SUBJECTS
 
     for key, label, emoji in SUBJECTS:
         is_selected = key in selected
-        mark = "✅" if is_selected else emoji
-        text = f"{mark} {label}"
+        if is_selected:
+            mark = "✅"
+            style = SUCCESS
+        elif at_max:
+            # Визуально «залочены» — клик всё равно отработает, но
+            # хендлер откажет с тостом, и юзер сразу понимает почему.
+            mark = "🔒"
+            style = None
+        else:
+            mark = emoji
+            style = None
         button = InlineKeyboardButton(
-            text=text,
+            text=f"{mark} {label}",
             callback_data=f"onb:subject:{key}",
-            style=SUCCESS if is_selected else None,
+            style=style,
         )
         pair.append(button)
         if len(pair) == 2:
@@ -98,27 +120,19 @@ def subjects_keyboard(selected: set[str]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-WEEKLY_HOURS = [10, 20, 30, 40]
+def hours_keyboard(selected: int | None = None) -> InlineKeyboardMarkup:
+    def _cell(h: int, default_emoji: str) -> InlineKeyboardButton:
+        is_active = selected == h
+        text = f"{'✅' if is_active else default_emoji} {h} ч/нед"
+        return InlineKeyboardButton(
+            text=text,
+            callback_data=f"onb:hours:{h}",
+            style=SUCCESS if is_active else PRIMARY,
+        )
 
-
-def hours_keyboard() -> InlineKeyboardMarkup:
     rows = [
-        [
-            InlineKeyboardButton(
-                text=f"⏱ {h} ч/нед",
-                callback_data=f"onb:hours:{h}",
-                style=PRIMARY,
-            )
-            for h in WEEKLY_HOURS[:2]
-        ],
-        [
-            InlineKeyboardButton(
-                text=f"🔥 {h} ч/нед",
-                callback_data=f"onb:hours:{h}",
-                style=PRIMARY,
-            )
-            for h in WEEKLY_HOURS[2:]
-        ],
+        [_cell(h, "⏱") for h in WEEKLY_HOURS[:2]],
+        [_cell(h, "🔥") for h in WEEKLY_HOURS[2:]],
         [InlineKeyboardButton(text="⬅️ Назад", callback_data="onb:back_subjects")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -145,6 +159,14 @@ def calibration_keyboard(subjects: list[str]) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text="⏭ Пропустить",
                 callback_data="onb:calib:skip",
+            )
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text="⬅️ Назад",
+                callback_data="onb:back_hours",
             )
         ]
     )
@@ -186,5 +208,65 @@ def about_back_keyboard() -> InlineKeyboardMarkup:
                     callback_data="onb:back_welcome",
                 )
             ]
+        ]
+    )
+
+
+def resume_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="▶️ Продолжить",
+                    callback_data="onb:resume:continue",
+                    style=PRIMARY,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔄 Начать заново",
+                    callback_data="onb:resume:restart",
+                )
+            ],
+        ]
+    )
+
+
+def settings_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔄 Пройти онбординг заново",
+                    callback_data="onb:reset:start",
+                    style=DANGER,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 В главное меню",
+                    callback_data="menu:home",
+                )
+            ],
+        ]
+    )
+
+
+def reset_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Да, начать заново",
+                    callback_data="onb:reset:confirm",
+                    style=DANGER,
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="↩ Отмена",
+                    callback_data="onb:reset:cancel",
+                ),
+            ],
         ]
     )
