@@ -15,7 +15,9 @@ dependencies = [
   "apscheduler>=3.10.4",
   "beautifulsoup4>=4.12.0",
   "requests>=2.31.0",
-  "sdamgia-api @ https://github.com/anijackich/sdamgia-api/archive/refs/heads/master.tar.gz"
+  "sdamgia-api @ https://github.com/anijackich/sdamgia-api/archive/refs/heads/master.tar.gz",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0"
 ]
 
 [build-system]
