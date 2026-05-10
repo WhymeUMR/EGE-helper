@@ -1,0 +1,161 @@
+# Прогоняем свежий seed-дамп через чистую postgres на каждом релизе
+# `seed-*`, чтобы кривой дамп не сломал старт у всех контрибьюторов.
+
+name: Validate seed dump
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Тег релиза для проверки (например seed-2026-05-10)"
+        required: true
+
+jobs:
+  validate:
+    # обычные релизы кода скипаем, проверяем только seed-*
+    if: startsWith(github.event.release.tag_name, 'seed-') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ege_helper
+          POSTGRES_USER: ege_user
+          POSTGRES_PASSWORD: ege_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ege_user -d ege_helper"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: ege_user
+      PGPASSWORD: ege_password
+      PGDATABASE: ege_helper
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install postgres client + python deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+          pip install --no-cache-dir "sqlalchemy[asyncio]>=2.0.30" "asyncpg>=0.29.0" "pydantic-settings>=2.3.0"
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download seed dump from release
+        run: |
+          gh release download "${{ steps.tag.outputs.tag }}" \
+            --pattern 'problems.sql.gz' \
+            --output problems.sql.gz
+          ls -lh problems.sql.gz
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Create schema (matches bot's create_all)
+        # ВАЖНО: SQL ниже должен совпадать с bot.db.models.Problem.
+        # Когда поменяешь модель — синхронизируй и тут (см. README → Парсер).
+        run: |
+          psql <<'SQL'
+          CREATE TABLE problems (
+              id SERIAL PRIMARY KEY,
+              subject VARCHAR(32) NOT NULL,
+              sdamgia_id VARCHAR(32) NOT NULL,
+              topic_number VARCHAR(16),
+              topic_name VARCHAR(512),
+              category_id VARCHAR(32),
+              category_name VARCHAR(512),
+              condition_text TEXT,
+              condition_images JSONB NOT NULL DEFAULT '[]'::jsonb,
+              solution_text TEXT,
+              solution_images JSONB NOT NULL DEFAULT '[]'::jsonb,
+              answer TEXT,
+              analogs JSONB NOT NULL DEFAULT '[]'::jsonb,
+              url VARCHAR(512),
+              created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+              CONSTRAINT uq_problems_subject_sdamgia_id UNIQUE (subject, sdamgia_id)
+          );
+          CREATE INDEX ix_problems_subject ON problems (subject);
+          CREATE INDEX ix_problems_sdamgia_id ON problems (sdamgia_id);
+          CREATE INDEX ix_problems_topic_number ON problems (topic_number);
+          CREATE INDEX ix_problems_category_id ON problems (category_id);
+          SQL
+
+      - name: Restore dump
+        run: |
+          gunzip -c problems.sql.gz | psql -v ON_ERROR_STOP=1
+
+      - name: Sanity-check restored data
+        run: |
+          set -e
+
+          TOTAL=$(psql -t -A -c "SELECT count(*) FROM problems;")
+          echo "total problems: $TOTAL"
+          if [[ "$TOTAL" -lt 10 ]]; then
+            echo "❌ слишком мало задач ($TOTAL) — дамп выглядит битым"
+            exit 1
+          fi
+
+          BAD=$(psql -t -A -c "
+            SELECT count(*) FROM problems
+            WHERE subject IS NULL OR subject = ''
+               OR sdamgia_id IS NULL OR sdamgia_id = '';
+          ")
+          if [[ "$BAD" -ne 0 ]]; then
+            echo "❌ $BAD строк с пустым subject/sdamgia_id"
+            exit 1
+          fi
+
+          # уникальность констрейнтом уже гарантирована, но проверим явно
+          # на случай если кто-то снимал дамп без --clean из старой схемы
+          DUPS=$(psql -t -A -c "
+            SELECT coalesce(sum(c - 1), 0) FROM (
+              SELECT count(*) c FROM problems GROUP BY subject, sdamgia_id
+            ) t;
+          ")
+          if [[ "$DUPS" -ne 0 ]]; then
+            echo "❌ $DUPS дублей по (subject, sdamgia_id)"
+            exit 1
+          fi
+
+          echo ""
+          echo "📊 разбивка по предметам:"
+          psql -c "
+            SELECT subject, count(*) AS problems
+            FROM problems GROUP BY subject ORDER BY 2 DESC;
+          "
+
+          echo "✅ seed валиден"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Seed validation · ${{ steps.tag.outputs.tag }}"
+            echo ""
+            psql -c "
+              SELECT subject, count(*) AS problems
+              FROM problems GROUP BY subject ORDER BY 2 DESC;
+            " 2>/dev/null || echo "(restore не дошёл до этого шага)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -17,6 +17,27 @@ services:
       redis:
         condition: service_healthy
 
+  parser:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ege-helper-bot:latest
+    container_name: ege_parser
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      # чтобы rich рисовал прогресс-бар цветным в логах
+      TERM: xterm-256color
+      FORCE_COLOR: "1"
+    tty: true
+    command: ["python", "-m", "parser.main"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:16-alpine
     container_name: ege_postgres
