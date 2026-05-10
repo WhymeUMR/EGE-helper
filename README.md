@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-<img src="https://img.shields.io/badge/aiogram-3.27-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" />
-<img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" />
-<img src="https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
-<img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" />
+<a href="https://github.com/WhymeUMR/EGE-helper/actions/workflows/tests.yml"><img src="https://github.com/WhymeUMR/EGE-helper/actions/workflows/tests.yml/badge.svg?branch=main" alt="tests" /></a>
+<img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" />
+<img src="https://img.shields.io/badge/aiogram-3.27-2CA5E0?style=flat-square&logo=telegram&logoColor=white" />
+<img src="https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white" />
+<img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white" />
+<img src="https://img.shields.io/badge/Redis-7-DC382D?style=flat-square&logo=redis&logoColor=white" />
+<img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
 
 # 🎯 EGE Helper
 
@@ -154,6 +156,26 @@ curl http://localhost:8000/api/v1/topics?subject=math | jq '.[0]'
 # { "topic_number": "1", "topic_name": "Планиметрия",
 #   "problems_count": 269, "categories": [...9 типов...] }
 ```
+
+### Тесты
+
+Юнит-тесты прогоняются без внешних зависимостей, integration-тесты используют postgres из `docker-compose`:
+
+```bash
+pip install -e ".[dev]"
+
+# юнит — быстро, без БД
+pytest tests/unit -v
+
+# integration (нужна поднятая postgres из compose, БД ege_helper_test создастся сама)
+docker compose up -d postgres
+POSTGRES_TEST_HOST=localhost POSTGRES_TEST_PORT=5433 pytest tests/integration -v
+
+# всё сразу
+pytest -v
+```
+
+CI на каждый push/PR в `main` гоняет `pytest -v` с поднятой postgres-сервисом — статус виден на бейдже сверху.
 
 ### Переменные окружения
 

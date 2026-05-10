@@ -1,5 +1,3 @@
-"""DB-запросы для API. Ровно те SQL, которые нужны эндпоинтам, без лишнего."""
-
 from __future__ import annotations
 
 from sqlalchemy import func, select
@@ -9,7 +7,6 @@ from bot.db.models import Problem
 
 
 async def list_subjects_with_stats(session: AsyncSession) -> list[dict]:
-    """Все предметы что есть в БД + сколько задач и топиков в каждом."""
     stmt = (
         select(
             Problem.subject,
@@ -27,13 +24,8 @@ async def list_subjects_with_stats(session: AsyncSession) -> list[dict]:
 
 
 async def list_topics(session: AsyncSession, subject: str) -> list[dict]:
-    """Структура «топик → категории» для предмета.
-
-    Один SQL отдаёт плоский список (topic_number, topic_name, category_id,
-    category_name, count), а уже на стороне Python собираем в дерево.
-    Делать это на стороне SQL через jsonb_agg тоже можно, но так понятнее
-    и индекса хватает обычного.
-    """
+    # один плоский GROUP BY → дерево собираем на python'е (так читабельнее
+    # чем jsonb_agg, а быстродействия с индексом хватает с запасом)
     stmt = (
         select(
             Problem.topic_number,
@@ -73,7 +65,7 @@ async def list_topics(session: AsyncSession, subject: str) -> list[dict]:
             }
         )
 
-    # сортировка номеров: 1, 2, ..., 19, потом Д1..Д19, потом всё остальное
+    # порядок: 1, 2, …, 19, потом Д1..Д19 и прочее в строковом порядке
     def sort_key(t: dict) -> tuple[int, str]:
         n = t["topic_number"] or ""
         if n.isdigit():
@@ -96,7 +88,6 @@ async def find_problems(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[int, list[Problem]]:
-    """Постраничный список задач + total. Total считаем тем же фильтром."""
     base = select(Problem).where(Problem.subject == subject)
     if topic_number is not None:
         base = base.where(Problem.topic_number == topic_number)
@@ -123,10 +114,7 @@ async def random_problem(
     category_name: str | None = None,
     category_id: str | None = None,
 ) -> Problem | None:
-    """Одна случайная задача под фильтр. ORDER BY random() — медленно на
-    больших таблицах, но у нас < 100к записей и индекс по (subject, topic_number)
-    отрезает большую часть. Если станет тормозить — перейдём на TABLESAMPLE.
-    """
+    # ORDER BY random() ок на текущих объёмах (<100к); если упрёмся — TABLESAMPLE
     stmt = select(Problem).where(Problem.subject == subject)
     if topic_number is not None:
         stmt = stmt.where(Problem.topic_number == topic_number)

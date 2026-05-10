@@ -1,4 +1,4 @@
-"""REST-эндпоинты. Пять штук, документация автоматом по /docs."""
+"""REST-эндпоинты. Документация автоматом на /docs."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_token)])
 
 @router.get("/subjects", response_model=list[SubjectInfo], tags=["meta"])
 async def list_subjects(session: AsyncSession = Depends(get_session)) -> list[SubjectInfo]:
-    """Все предметы в БД с количеством задач и номеров заданий."""
+    """Все предметы в БД с количеством задач и номеров."""
     rows = await repo.list_subjects_with_stats(session)
     return [
         SubjectInfo(
@@ -40,7 +40,7 @@ async def list_topics(
     subject: str = Query(..., description="ключ предмета: math, russian, ..."),
     session: AsyncSession = Depends(get_session),
 ) -> list[TopicInfo]:
-    """Структура предмета: какие номера заданий есть и какие типы внутри каждого."""
+    """Какие номера заданий есть в предмете и какие типы внутри каждого."""
     topics = await repo.list_topics(session, subject)
     return [
         TopicInfo(
@@ -63,7 +63,7 @@ async def list_problems(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_session),
 ) -> ProblemsPage:
-    """Постраничный список задач под фильтр."""
+    """Постраничный список задач."""
     total, items = await repo.find_problems(
         session,
         subject=subject,
@@ -89,7 +89,7 @@ async def random_problem(
     category_id: str | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> ProblemOut:
-    """Одна случайная задача под фильтр — для бота-тренажёра."""
+    """Одна случайная задача под фильтр (для тренажёра)."""
     problem = await repo.random_problem(
         session,
         subject=subject,
@@ -115,7 +115,7 @@ async def get_problem(
     sdamgia_id: str,
     session: AsyncSession = Depends(get_session),
 ) -> ProblemOut:
-    """Одна задача по составному ключу `(subject, sdamgia_id)`."""
+    """Одна задача по `(subject, sdamgia_id)`."""
     problem = await repo.get_problem_by_id(
         session, subject=subject, sdamgia_id=sdamgia_id
     )

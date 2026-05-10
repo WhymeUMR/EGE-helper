@@ -1,4 +1,4 @@
-"""Entrypoint API-сервиса: FastAPI + uvicorn + составной индекс на старте."""
+"""Entrypoint API: FastAPI + uvicorn, в startup ленивый индекс на (subject, topic_number)."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # составной индекс ускоряет основной сценарий «subject + номер»
-    # IF NOT EXISTS — идемпотентно, безопасно держать в startup
+    # IF NOT EXISTS делает startup идемпотентным; пока нет alembic — это самое
+    # дешёвое место для индекса под основной фильтр
     async with engine.begin() as conn:
         await conn.execute(
             text(
@@ -53,7 +53,7 @@ def main() -> None:
         "api.main:app",
         host=settings.api_host,
         port=settings.api_port,
-        log_config=None,  # пусть rich-логгер из bot.logging_config рулит
+        log_config=None,  # пусть rich из bot.logging_config рулит выводом
     )
 
 

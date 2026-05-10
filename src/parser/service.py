@@ -68,12 +68,16 @@ async def _collect_category_ids(
             break
         if not ids:
             break
-        new_on_page = [pid for pid in ids if pid not in seen]
+        new_on_page: list[str] = []
+        for pid in ids:
+            # дедупим и внутри страницы, и между страницами одним проходом
+            if pid in seen:
+                continue
+            seen.add(pid)
+            new_on_page.append(pid)
         if not new_on_page:
             break
-        for pid in new_on_page:
-            seen.add(pid)
-            ordered.append(pid)
+        ordered.extend(new_on_page)
     return ordered
 
 

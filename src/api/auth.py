@@ -1,4 +1,4 @@
-"""Опциональный Bearer-token. Пустой API_TOKEN = публичный API."""
+"""Опциональный Bearer: пустой API_TOKEN — пропускаем всех."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Dependency-инжекшен сессии БД для роутов."""
+"""DB-сессия для роутов через FastAPI Depends."""
 
 from __future__ import annotations
 

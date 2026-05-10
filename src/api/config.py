@@ -1,4 +1,4 @@
-"""Свой Settings для API: переиспользует postgres-поля + добавляет API-специфичные."""
+"""ApiSettings — postgres-поля общие с ботом, плюс свои API_*."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class ApiSettings(BaseSettings):
 
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
-    # пусто = публичный API; иначе требуем Authorization: Bearer <token>
+    # пусто = публично, иначе нужен Authorization: Bearer <token>
     api_token: str = Field(default="", alias="API_TOKEN")
 
     @property

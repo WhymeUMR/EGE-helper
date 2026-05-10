@@ -1,0 +1,51 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ege_helper
+          POSTGRES_USER: ege_user
+          POSTGRES_PASSWORD: ege_password
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U ege_user -d ege_helper"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # тестовая БД (создаётся в conftest на лету в том же postgres-инстансе)
+      POSTGRES_TEST_HOST: localhost
+      POSTGRES_TEST_PORT: 5433
+      POSTGRES_TEST_DB: ege_helper_test
+      POSTGRES_TEST_USER: ege_user
+      POSTGRES_TEST_PASSWORD: ege_password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install project + dev deps
+        run: |
+          pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run pytest (unit + integration)
+        run: pytest -v --tb=short
