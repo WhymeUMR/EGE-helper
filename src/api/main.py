@@ -13,8 +13,10 @@ from starlette.responses import Response
 
 from api.config import settings
 from api.deps import engine
+from api.routers.attempts import router as attempts_router
 from api.routers.auth import router as auth_router
 from api.routers.catalog import router as catalog_router
+from api.routers.checking import router as checking_router
 from api.routers.me import router as me_router
 from api.routers.problems import router as problems_router
 from api.routers.meta import (
@@ -74,6 +76,8 @@ app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(catalog_router)
 app.include_router(problems_router)
+app.include_router(attempts_router)
+app.include_router(checking_router)
 app.include_router(legacy_router)
 
 
