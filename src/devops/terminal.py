@@ -90,6 +90,14 @@ class TerminalView(Widget):
         self._screen = pyte.HistoryScreen(cols, rows, history=2000, ratio=0.5)
         self._stream = pyte.Stream(self._screen)
 
+    def _resize_to_viewport(self) -> None:
+        # Keep VT grid in sync with actual widget size, otherwise rich frames
+        # may look cut off or uneven when terminal/UI dimensions differ.
+        cols = max(1, self.size.width)
+        rows = max(1, self.size.height)
+        if cols != self._screen.columns or rows != self._screen.lines:
+            self._screen.resize(lines=rows, columns=cols)
+
     def feed(self, data: str) -> None:
         self._stream.feed(data)
         self.refresh()
@@ -102,6 +110,7 @@ class TerminalView(Widget):
         self.refresh()
 
     def render(self) -> Text:
+        self._resize_to_viewport()
         out = Text()
         screen = self._screen
         for y in range(screen.lines):
