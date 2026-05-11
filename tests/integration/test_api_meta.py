@@ -67,6 +67,26 @@ async def test_meta_features_lists_blocks(api_client):
 
 
 @pytest.mark.asyncio
+async def test_openapi_schema_exposes_all_tags(api_client):
+    response = await api_client.get("/openapi.json")
+    assert response.status_code == 200
+    schema = response.json()
+    tag_names = {t["name"] for t in schema.get("tags", [])}
+    # все группы из главных блоков представлены
+    for tag in ("auth", "me", "catalog", "problems", "attempts", "checking", "meta"):
+        assert tag in tag_names, f"tag {tag!r} missing from openapi schema"
+    # BearerAuth security scheme присутствует
+    assert "BearerAuth" in schema["components"]["securitySchemes"]
+
+
+@pytest.mark.asyncio
+async def test_swagger_ui_loads(api_client):
+    response = await api_client.get("/docs")
+    assert response.status_code == 200
+    assert "swagger-ui" in response.text.lower()
+
+
+@pytest.mark.asyncio
 async def test_meta_limits_returns_constants(api_client):
     response = await api_client.get("/api/v1/meta/limits")
     assert response.status_code == 200

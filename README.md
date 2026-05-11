@@ -20,7 +20,7 @@
 
 ---
 
-> ⚠️ **Статус:** ранний этап разработки (`v0.2`). Работает онбординг, профиль с обратным отсчётом до ЕГЭ, главное меню как дашборд, настройки, сброс. Поднят отдельный parser-сервис: тянет каталог задач СдамГИА в Postgres, поддерживает seed-импорт из GitHub Releases. Алгоритм SM-2 и MiniApp — следующие на очереди.
+> ⚠️ **Статус:** ранний этап разработки (`v0.2`). Работает онбординг, профиль с обратным отсчётом до ЕГЭ, главное меню как дашборд, настройки, сброс. Поднят отдельный parser-сервис: тянет каталог задач СдамГИА в Postgres, поддерживает seed-импорт из GitHub Releases. Поднят полноценный REST API платформы: auth/JWT, каталог, problems с проверкой ответов и закладками, attempts (полный цикл решения варианта с автоподсчётом баллов), Prometheus-метрики и Swagger на `/docs` — см. раздел [REST API](#rest-api). Алгоритм SM-2 и MiniApp — следующие на очереди.
 
 ---
 
@@ -151,22 +151,131 @@ docker compose logs -f parser
 
 ### REST API
 
-Сервис `api` поднимает FastAPI на `:8000` со swagger-доками на `/docs`. Эндпоинты — фильтрация задач по предмету/номеру/типу:
+Сервис `api` поднимает FastAPI на `:8000`. Интерактивный Swagger — на `/docs` (с кнопкой **Authorize** для JWT), ReDoc — на `/redoc`, чистый OpenAPI JSON — на `/openapi.json`.
 
-```
-GET /api/v1/subjects                                       список предметов + статистика
-GET /api/v1/topics?subject=math                            какие номера и типы есть
-GET /api/v1/problems?subject=math&topic_number=7&limit=50  постраничная выдача
-GET /api/v1/problems/random?subject=math&topic_number=7    случайная задача под фильтр
-GET /api/v1/problems/{subject}/{sdamgia_id}                одна задача по составному ключу
-```
+Авторизация: bcrypt + JWT (access + rotating refresh). Получи пару токенов через `POST /api/v1/auth/register` или `/auth/login`, дальше шли `Authorization: Bearer <access_token>` (или жми «Authorize» в swagger).
 
-Опциональная Bearer-авторизация через `API_TOKEN` в `.env` (пусто = публичный API).
+#### Реализованные блоки (фаза 1)
+
+Всё ниже — рабочее, покрыто 174 интеграционными тестами.
+
+**🔐 Auth & Users** — `auth`, `me`
+
+| | endpoint | требует JWT |
+|---|---|---|
+| ✅ | `POST   /api/v1/auth/register` | — |
+| ✅ | `POST   /api/v1/auth/login` | — |
+| ✅ | `POST   /api/v1/auth/refresh` | — |
+| ✅ | `POST   /api/v1/auth/logout` | — |
+| ✅ | `GET    /api/v1/me` | да |
+| ✅ | `PATCH  /api/v1/me/profile` | да |
+| ✅ | `PATCH  /api/v1/me/settings` | да |
+| ✅ | `DELETE /api/v1/me` (soft-delete) | да |
+| ✅ | `POST   /api/v1/me/telegram/link` | да |
+| ✅ | `DELETE /api/v1/me/telegram/link` | да |
+
+**📚 Catalog Meta** — `catalog`
+
+| | endpoint |
+|---|---|
+| ✅ | `GET /api/v1/subjects` (все 11 предметов + статистика) |
+| ✅ | `GET /api/v1/subjects/{subject}/meta` |
+| ✅ | `GET /api/v1/subjects/{subject}/blueprints` (структура варианта ЕГЭ) |
+| ✅ | `GET /api/v1/subjects/{subject}/topic-map` |
+| ✅ | `GET /api/v1/subjects/{subject}/difficulty-scale` |
+| ✅ | `GET /api/v1/subjects/{subject}/scoring-rules` |
+
+> Шкалы перевода первичный→тестовый сейчас линейная аппроксимация (`version: "2025-linear-approx"`). Замена на официальные шкалы Рособрнадзора-2025 — в `src/api/seeds/scoring_rules.py`.
+
+**📝 Problems** — `problems`
+
+| | endpoint | требует JWT |
+|---|---|---|
+| ✅ | `GET    /api/v1/problems` | — |
+| ✅ | `GET    /api/v1/problems/random` | — |
+| ✅ | `GET    /api/v1/problems/{subject}/{sdamgia_id}` | — |
+| ✅ | `POST   /api/v1/problems/search` (фильтры в body, ILIKE по тексту) | — |
+| ✅ | `GET    /api/v1/problems/similar/{subject}/{sdamgia_id}` | — |
+| ✅ | `POST   /api/v1/problems/{subject}/{sdamgia_id}/check` | — |
+| ✅ | `POST   /api/v1/problems/{subject}/{sdamgia_id}/bookmark` | да |
+| ✅ | `DELETE /api/v1/problems/{subject}/{sdamgia_id}/bookmark` | да |
+| ✅ | `POST   /api/v1/problems/{subject}/{sdamgia_id}/report` | да |
+
+**▶️ Attempts** — `attempts` (всё — JWT-only)
+
+| | endpoint |
+|---|---|
+| ✅ | `POST  /api/v1/attempts/start` (по `variant_id` ИЛИ inline `problem_ids`/`sdamgia_ids`) |
+| ✅ | `GET   /api/v1/attempts/{id}` |
+| ✅ | `PATCH /api/v1/attempts/{id}` (тайминг) |
+| ✅ | `POST  /api/v1/attempts/{id}/answer/{problem_id}` |
+| ✅ | `POST  /api/v1/attempts/{id}/answers` (batch) |
+| ✅ | `POST  /api/v1/attempts/{id}/submit` |
+| ✅ | `POST  /api/v1/attempts/{id}/resume` |
+| ✅ | `POST  /api/v1/attempts/{id}/abandon` |
+| ✅ | `GET   /api/v1/attempts/{id}/review` |
+| ✅ | `GET   /api/v1/attempts/{id}/mistakes` |
+
+**✔️ Checking & Scoring** — `checking`
+
+| | endpoint | требует JWT |
+|---|---|---|
+| ✅ | `POST /api/v1/checking/answers/validate` (нормализация) | — |
+| ✅ | `POST /api/v1/checking/answers/check` | — |
+| ✅ | `POST /api/v1/checking/attempts/{id}/recheck` | да |
+| ✅ | `GET  /api/v1/checking/attempts/{id}/score` | да |
+| ✅ | `GET  /api/v1/checking/attempts/{id}/criteria` | да |
+| ✅ | `GET  /api/v1/checking/attempts/{id}/primary-points` | да |
+| ✅ | `GET  /api/v1/checking/attempts/{id}/test-points` | да |
+
+**🛠 Platform / Infra** — `meta`
+
+| | endpoint |
+|---|---|
+| ✅ | `GET /health` |
+| ✅ | `GET /live` |
+| ✅ | `GET /ready` (пинг postgres) |
+| ✅ | `GET /metrics` (Prometheus) |
+| ✅ | `GET /api/v1/meta/version` |
+| ✅ | `GET /api/v1/meta/features` |
+| ✅ | `GET /api/v1/meta/limits` |
+
+**Legacy** (для бота, поверх опционального `API_TOKEN` в `.env`):
+
+| | endpoint |
+|---|---|
+| ✅ | `GET /api/v1/topics?subject=math` (эквивалент `/subjects/{subject}/topic-map`) |
+
+#### Запланировано (фаза 2)
+
+`variants` (CRUD/clone/publish/export PDF/DOCX), `analytics`, `homework/teacher/class`, `social/discussions/collections/feed`, `notifications/webhooks`, `admin/moderation`. Эндпоинты с этими тегами в `/api/v1/meta/features` помечены как `false`.
+
+#### Пример: пройти вариант от старта до результата
 
 ```bash
-curl http://localhost:8000/api/v1/topics?subject=math | jq '.[0]'
-# { "topic_number": "1", "topic_name": "Планиметрия",
-#   "problems_count": 269, "categories": [...9 типов...] }
+# 1) регистрация
+TOKEN=$(curl -s -X POST localhost:8000/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"u@example.com","password":"pass1234"}' | jq -r .access_token)
+
+# 2) старт attempt из 3 случайных задач по математике
+ATTEMPT=$(curl -s -X POST localhost:8000/api/v1/attempts/start \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"subject":"math","sdamgia_ids":["12345","12346","12347"]}')
+ID=$(echo "$ATTEMPT" | jq .id)
+
+# 3) сохранить ответы пачкой
+curl -s -X POST localhost:8000/api/v1/attempts/$ID/answers \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"answers":[{"problem_id":1,"answer":"42"},{"problem_id":2,"answer":"0,5"}]}'
+
+# 4) submit + результат
+curl -s -X POST localhost:8000/api/v1/attempts/$ID/submit \
+  -H "Authorization: Bearer $TOKEN" | jq '{primary_score, test_score}'
+
+# 5) разбор
+curl -s localhost:8000/api/v1/attempts/$ID/review \
+  -H "Authorization: Bearer $TOKEN" | jq '.items[] | {position, user_answer, correct_answer, is_correct}'
 ```
 
 ### Тесты
@@ -304,24 +413,26 @@ catalog  → (ничего)
 - [x] Настройки с просмотром профиля и сбросом
 - [x] Послойная архитектура (catalog / texts / screens / services / utils)
 
-### v0.2 — Контент 🚧
+### v0.2 — Контент и платформенный API 🚧
 
 - [x] Парсинг заданий через [`sdamgia-api`](https://github.com/anijackich/sdamgia-api) — отдельный async-сервис
 - [x] Кэширование задач в собственной БД (схема + индексы, дедуп по `sdamgia_id`)
 - [x] Seed-дампы на GitHub Releases с валидацией через CI
-- [x] Фильтрация по номеру и типу задания — REST API на FastAPI
+- [x] **Полноценный REST API платформы**: auth + me, catalog meta, problems (search/similar/check/bookmark/report), attempts (start/submit/review/mistakes), checking (validate/score/criteria/test-points), platform/infra
+- [x] **Автопроверка ответов части 1** через `/api/v1/problems/{s}/{id}/check` и при `/attempts/{id}/submit`
+- [x] **Трекинг времени решения** на уровне attempt и каждого ответа
 - [ ] Расписание (часов в неделю → задач в день, ~17 мин на задачу)
 - [ ] MiniApp для удобного решения задач прямо в Telegram
 - [ ] Экран «📚 Материалы» — конспекты, формулы, шпаргалки
 - [ ] Калибровка — опциональный пробный вариант на старте
-- [ ] Полный пробный вариант ЕГЭ за раз (с общим таймером)
+- [ ] Замена линейной шкалы scoring на официальные таблицы Рособрнадзора-2025
 
 ### v0.3 — SM-2 и аналитика
 
 - [ ] Реализация алгоритма SM-2 (интервалы повторения по типам задач)
-- [ ] Автопроверка ответов части 1
-- [ ] Самооценка части 2 (с показом эталонного решения)
-- [ ] Трекинг времени решения каждой задачи
+- [ ] Самооценка части 2 (с показом эталонного решения) — фронт поверх `criteria_scores`
+- [ ] Variants CRUD + генерация по blueprint (блок 4 API)
+- [ ] Analytics endpoints: weak-topics / progress-curve / recommendations (блок 7)
 - [ ] Заполнение «🔥 Серия» и «🎯 Цель на сегодня» в дашборде
 - [ ] Экран «📊 Статистика» — топ слабых тем, тренд по неделям
 
