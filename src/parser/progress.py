@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rich import box
 from rich.console import Console, Group
 from rich.live import Live
 from rich.panel import Panel
@@ -51,7 +52,7 @@ class ParserUI:
             TextColumn("[bold cyan]Предметы[/]"),
             BarColumn(bar_width=None, complete_style="cyan", finished_style="green"),
             MofNCompleteColumn(),
-            TextColumn("•"),
+            TextColumn("|"),
             TimeElapsedColumn(),
             console=self.console,
             expand=True,
@@ -61,10 +62,10 @@ class ParserUI:
             TextColumn("[bold]{task.description}[/]"),
             BarColumn(bar_width=None, complete_style="magenta", finished_style="green"),
             MofNCompleteColumn(),
-            TextColumn("[green]✓ {task.fields[fetched]}[/]"),
-            TextColumn("[yellow]⏭ {task.fields[skipped]}[/]"),
-            TextColumn("[red]✗ {task.fields[errors]}[/]"),
-            TextColumn("•"),
+            TextColumn("[green]OK {task.fields[fetched]}[/]"),
+            TextColumn("[yellow]SKIP {task.fields[skipped]}[/]"),
+            TextColumn("[red]ERR {task.fields[errors]}[/]"),
+            TextColumn("|"),
             TimeRemainingColumn(),
             console=self.console,
             expand=True,
@@ -151,16 +152,16 @@ class ParserUI:
         table.add_column(justify="right")
 
         left = Text()
-        left.append("📚 ", style="bold")
+        left.append("SUBJECT ", style="bold")
         left.append(self.current_subject_label or "—", style="bold cyan")
         if self.stats.current_category:
-            left.append("  •  ", style="dim")
+            left.append("  |  ", style="dim")
             left.append(self.stats.current_category, style="white")
 
         right = Text()
-        right.append(f"✓ {self.stats.fetched} ", style="green")
-        right.append(f"⏭ {self.stats.skipped} ", style="yellow")
-        right.append(f"✗ {self.stats.errors}", style="red")
+        right.append(f"OK {self.stats.fetched} ", style="green")
+        right.append(f"SKIP {self.stats.skipped} ", style="yellow")
+        right.append(f"ERR {self.stats.errors}", style="red")
 
         table.add_row(left, right)
         return table
@@ -174,7 +175,8 @@ class ParserUI:
         )
         return Panel(
             body,
-            title="[bold cyan]🎯 EGE Parser · СдамГИА → Postgres[/]",
+            title="[bold cyan]EGE Parser | SdamGIA -> Postgres[/]",
             border_style="cyan",
+            box=box.ASCII,
             padding=(1, 2),
         )
