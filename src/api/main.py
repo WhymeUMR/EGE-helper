@@ -1,4 +1,4 @@
-"""Entrypoint API: FastAPI + uvicorn, в startup ленивый индекс на (subject, topic_number)."""
+"""Entrypoint API: FastAPI + uvicorn."""
 
 from __future__ import annotations
 
@@ -11,7 +11,9 @@ from sqlalchemy import text
 
 from api.config import settings
 from api.deps import engine
-from api.routes import router
+from api.routers.auth import router as auth_router
+from api.routers.me import router as me_router
+from api.routes import router as legacy_router
 from bot.logging_config import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -19,8 +21,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # IF NOT EXISTS делает startup идемпотентным; пока нет alembic — это самое
-    # дешёвое место для индекса под основной фильтр
     async with engine.begin() as conn:
         await conn.execute(
             text(
@@ -35,11 +35,13 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="EGE Helper API",
-    description="Доступ к каталогу задач СдамГИА из БД EGE Helper.",
-    version="0.1.0",
+    description="REST API платформы EGE Helper.",
+    version="0.2.0",
     lifespan=lifespan,
 )
-app.include_router(router)
+app.include_router(auth_router)
+app.include_router(me_router)
+app.include_router(legacy_router)  # старые /api/v1/{subjects,topics,problems,problems/*}
 
 
 @app.get("/health", tags=["meta"])
@@ -53,7 +55,7 @@ def main() -> None:
         "api.main:app",
         host=settings.api_host,
         port=settings.api_port,
-        log_config=None,  # пусть rich из bot.logging_config рулит выводом
+        log_config=None,
     )
 
 

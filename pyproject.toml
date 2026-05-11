@@ -17,7 +17,10 @@ dependencies = [
   "requests>=2.31.0",
   "sdamgia-api @ https://github.com/anijackich/sdamgia-api/archive/refs/heads/master.tar.gz",
   "fastapi>=0.115.0",
-  "uvicorn[standard]>=0.30.0"
+  "uvicorn[standard]>=0.30.0",
+  "pyjwt>=2.9.0",
+  "bcrypt>=4.2.0",
+  "email-validator>=2.2.0"
 ]
 
 [project.optional-dependencies]

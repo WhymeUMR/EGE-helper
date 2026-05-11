@@ -252,6 +252,15 @@ class ControlCenter(App):
     async def _stream(self, svc: str) -> None:
         terminal = self.query_one(TerminalView)
         try:
+            if svc == "parser":
+                # parser emits a live VT stream (rich.Live); feed raw chunks
+                # so cursor movement and line erases are preserved correctly.
+                # Start from fresh output; tailing old lines may attach to the
+                # middle of an already drawn frame and break panel borders.
+                async for chunk in docker.stream_logs_raw(svc, tail=0):
+                    terminal.feed(chunk)
+                return
+
             async for line in docker.stream_logs(svc, tail=80):
                 # снимаем `parser  | ` префикс — пусть pyte видит чистый поток
                 payload = DOCKER_LOG_PREFIX.sub("", line)

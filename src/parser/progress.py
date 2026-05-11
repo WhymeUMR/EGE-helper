@@ -177,6 +177,6 @@ class ParserUI:
             body,
             title="[bold cyan]EGE Parser | SdamGIA -> Postgres[/]",
             border_style="cyan",
-            box=box.ROUNDED,
-            padding=(1, 2),
+            box=box.SQUARE,
+            padding=(0, 1),
         )

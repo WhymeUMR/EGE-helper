@@ -24,8 +24,18 @@ class ApiSettings(BaseSettings):
 
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
-    # пусто = публично, иначе нужен Authorization: Bearer <token>
+    # legacy bearer (для совместимости со старым обвесом). Если задан — старые
+    # эндпоинты каталога/проблем требуют его И/ИЛИ JWT.
     api_token: str = Field(default="", alias="API_TOKEN")
+
+    # JWT: секрет ОБЯЗАН быть задан в проде. Дефолт оставлен только для тестов.
+    jwt_secret: str = Field(default="dev-only-change-me", alias="JWT_SECRET")
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_access_ttl_minutes: int = Field(default=60, alias="JWT_ACCESS_TTL_MINUTES")
+    jwt_refresh_ttl_days: int = Field(default=30, alias="JWT_REFRESH_TTL_DAYS")
+    # /auth/register опционально можно закрыть инвайтами. Пока оставляем открытым.
+    registration_open: bool = Field(default=True, alias="REGISTRATION_OPEN")
+    telegram_link_ttl_minutes: int = Field(default=10, alias="TELEGRAM_LINK_TTL_MINUTES")
 
     @property
     def postgres_dsn(self) -> str:

@@ -63,6 +63,9 @@ async def engine():
 
         bootstrap = create_async_engine(_test_dsn(), poolclass=NullPool)
         async with bootstrap.begin() as conn:
+            # пересобираем схему с нуля — миграций пока нет, а структура
+            # активно эволюционирует, иначе старые БД ловят несовместимость
+            await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
             await conn.execute(
                 text(
@@ -78,10 +81,27 @@ async def engine():
     await eng.dispose()
 
 
+_ALL_TABLES = (
+    "attempt_answers",
+    "attempts",
+    "variants",
+    "bookmarks",
+    "problem_reports",
+    "problems",
+    "telegram_link_codes",
+    "refresh_tokens",
+    "blueprints",
+    "scoring_rules",
+    "users",
+)
+
+
 @pytest_asyncio.fixture
 async def session(engine) -> AsyncSession:
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE TABLE problems RESTART IDENTITY CASCADE"))
+        await conn.execute(
+            text(f"TRUNCATE TABLE {', '.join(_ALL_TABLES)} RESTART IDENTITY CASCADE")
+        )
     sf = async_sessionmaker(engine, expire_on_commit=False)
     async with sf() as s:
         yield s
