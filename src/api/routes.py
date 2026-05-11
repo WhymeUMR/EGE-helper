@@ -1,21 +1,17 @@
-"""REST-эндпоинты. Документация автоматом на /docs."""
+"""Legacy роутер: оставлен для обратной совместимости со старыми клиентами,
+которые ждут /api/v1/topics. /subjects и /problems перенесены в
+api/routers/{catalog,problems}.py.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api import repository as repo
 from api.auth import require_token
 from api.deps import get_session
-from api.schemas import (
-    CategoryInfo,
-    ProblemOut,
-    ProblemsPage,
-    SubjectInfo,
-    TopicInfo,
-)
-from bot.catalog import SUBJECT_LABELS
+from api.schemas import CategoryInfo, TopicInfo
 
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_token)])
 
@@ -25,7 +21,11 @@ async def list_topics(
     subject: str = Query(..., description="ключ предмета: math, russian, ..."),
     session: AsyncSession = Depends(get_session),
 ) -> list[TopicInfo]:
-    """Какие номера заданий есть в предмете и какие типы внутри каждого."""
+    """Какие номера заданий есть в предмете и какие типы внутри каждого.
+
+    Эквивалентно /api/v1/subjects/{subject}/topic-map. Оставлено для бота,
+    который ходит сюда исторически.
+    """
     topics = await repo.list_topics(session, subject)
     return [
         TopicInfo(
@@ -36,74 +36,3 @@ async def list_topics(
         )
         for t in topics
     ]
-
-
-@router.get("/problems", response_model=ProblemsPage, tags=["problems"])
-async def list_problems(
-    subject: str = Query(...),
-    topic_number: str | None = Query(default=None, description="например '7' или 'Д8 C1'"),
-    category_name: str | None = Query(default=None),
-    category_id: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    session: AsyncSession = Depends(get_session),
-) -> ProblemsPage:
-    """Постраничный список задач."""
-    total, items = await repo.find_problems(
-        session,
-        subject=subject,
-        topic_number=topic_number,
-        category_name=category_name,
-        category_id=category_id,
-        limit=limit,
-        offset=offset,
-    )
-    return ProblemsPage(
-        total=total,
-        limit=limit,
-        offset=offset,
-        items=[ProblemOut.model_validate(p) for p in items],
-    )
-
-
-@router.get("/problems/random", response_model=ProblemOut, tags=["problems"])
-async def random_problem(
-    subject: str = Query(...),
-    topic_number: str | None = Query(default=None),
-    category_name: str | None = Query(default=None),
-    category_id: str | None = Query(default=None),
-    session: AsyncSession = Depends(get_session),
-) -> ProblemOut:
-    """Одна случайная задача под фильтр (для тренажёра)."""
-    problem = await repo.random_problem(
-        session,
-        subject=subject,
-        topic_number=topic_number,
-        category_name=category_name,
-        category_id=category_id,
-    )
-    if problem is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="no problems matching filter",
-        )
-    return ProblemOut.model_validate(problem)
-
-
-@router.get(
-    "/problems/{subject}/{sdamgia_id}",
-    response_model=ProblemOut,
-    tags=["problems"],
-)
-async def get_problem(
-    subject: str,
-    sdamgia_id: str,
-    session: AsyncSession = Depends(get_session),
-) -> ProblemOut:
-    """Одна задача по `(subject, sdamgia_id)`."""
-    problem = await repo.get_problem_by_id(
-        session, subject=subject, sdamgia_id=sdamgia_id
-    )
-    if problem is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-    return ProblemOut.model_validate(problem)

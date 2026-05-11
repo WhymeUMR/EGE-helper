@@ -16,6 +16,7 @@ from api.deps import engine
 from api.routers.auth import router as auth_router
 from api.routers.catalog import router as catalog_router
 from api.routers.me import router as me_router
+from api.routers.problems import router as problems_router
 from api.routers.meta import (
     http_request_duration_seconds,
     http_requests_total,
@@ -72,6 +73,7 @@ app.include_router(meta_router)
 app.include_router(auth_router)
 app.include_router(me_router)
 app.include_router(catalog_router)
+app.include_router(problems_router)
 app.include_router(legacy_router)
 
 
