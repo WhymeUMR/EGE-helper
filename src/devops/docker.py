@@ -8,12 +8,13 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+_COMPOSE_CMD: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -39,21 +40,76 @@ class ServiceStatus:
 
 
 async def _compose(*args: str) -> tuple[int, str, str]:
-    proc = await asyncio.create_subprocess_exec(
-        "docker", "compose", *args,
-        cwd=str(REPO_ROOT),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, stderr = await proc.communicate()
-    return proc.returncode or 0, stdout.decode(errors="replace"), stderr.decode(errors="replace")
+    global _COMPOSE_CMD
+    if _COMPOSE_CMD is None:
+        if shutil.which("docker-compose"):
+            _COMPOSE_CMD = ("docker-compose",)
+        else:
+            _COMPOSE_CMD = ("docker", "compose")
+
+    async def _run(cmd: tuple[str, ...]) -> tuple[int, str, str]:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, *args,
+            cwd=str(REPO_ROOT),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        return (
+            proc.returncode or 0,
+            stdout.decode(errors="replace"),
+            stderr.decode(errors="replace"),
+        )
+
+    code, out, err = await _run(_COMPOSE_CMD)
+    # If docker exists but compose plugin is missing, retry with docker-compose.
+    if (
+        code != 0
+        and _COMPOSE_CMD == ("docker", "compose")
+        and shutil.which("docker-compose")
+        and ("is not a docker command" in err.lower() or "unknown command" in err.lower())
+    ):
+        _COMPOSE_CMD = ("docker-compose",)
+        return await _run(_COMPOSE_CMD)
+
+    return code, out, err
 
 
 async def list_services() -> list[str]:
     code, out, _ = await _compose("config", "--services")
-    if code != 0:
-        return []
-    return [line.strip() for line in out.splitlines() if line.strip()]
+    if code == 0:
+        services = [line.strip() for line in out.splitlines() if line.strip()]
+        if services:
+            return services
+
+    # fallback: some compose/plugin versions fail on `config --services`
+    # while `ps --services` still works.
+    code, out, _ = await _compose("ps", "--services")
+    if code == 0:
+        return [line.strip() for line in out.splitlines() if line.strip()]
+    return []
+
+
+async def _docker_inspect(container_id: str) -> tuple[str, str | None]:
+    """Return (state, health) from docker inspect. Unknowns -> ('stopped', None)."""
+    proc = await asyncio.create_subprocess_exec(
+        "docker",
+        "inspect",
+        "--format",
+        "{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}",
+        container_id,
+        cwd=str(REPO_ROOT),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await proc.communicate()
+    if proc.returncode != 0:
+        return "stopped", None
+    raw = stdout.decode(errors="replace").strip()
+    if not raw:
+        return "stopped", None
+    state, _, health = raw.partition("|")
+    return (state.strip().lower() or "stopped"), (health.strip().lower() or None)
 
 
 async def status_all() -> list[ServiceStatus]:
@@ -63,29 +119,29 @@ async def status_all() -> list[ServiceStatus]:
     чтобы остановленные тоже были в списке (можно нажать start).
     """
     declared = await list_services()
-    code, out, _ = await _compose("ps", "-a", "--format", "json")
-    seen: dict[str, ServiceStatus] = {}
-    if code == 0:
-        for line in out.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            name = row.get("Service") or row.get("Name") or ""
-            seen[name] = ServiceStatus(
-                name=name,
-                state=(row.get("State") or "").lower(),
-                health=(row.get("Health") or None) or None,
-                container_id=row.get("ID") or None,
+    # Cross-version path compatible with docker compose plugin and legacy docker-compose:
+    # resolve container IDs per service, then inspect via plain docker.
+    statuses: list[ServiceStatus] = []
+    for service in declared:
+        code, out, _ = await _compose("ps", "-q", service)
+        container_id = out.strip() if code == 0 else ""
+        if not container_id:
+            statuses.append(
+                ServiceStatus(name=service, state="stopped", health=None, container_id=None)
             )
+            continue
 
-    return [
-        seen.get(name, ServiceStatus(name=name, state="stopped", health=None, container_id=None))
-        for name in declared
-    ]
+        state, health = await _docker_inspect(container_id)
+        statuses.append(
+            ServiceStatus(
+                name=service,
+                state=state,
+                health=health,
+                container_id=container_id,
+            )
+        )
+
+    return statuses
 
 
 async def start(service: str) -> tuple[int, str]:
@@ -119,8 +175,15 @@ async def stream_logs(service: str, tail: int = 80) -> AsyncIterator[str]:
     Прерывание делаем через CancelledError на стороне вызывающего: когда
     юзер переключает сервис, отменяем итератор и subprocess получает SIGTERM.
     """
+    global _COMPOSE_CMD
+    if _COMPOSE_CMD is None:
+        if shutil.which("docker-compose"):
+            _COMPOSE_CMD = ("docker-compose",)
+        else:
+            _COMPOSE_CMD = ("docker", "compose")
+
     proc = await asyncio.create_subprocess_exec(
-        "docker", "compose", "logs", "--no-color", "-f", "--tail", str(tail), service,
+        *_COMPOSE_CMD, "logs", "--no-color", "-f", "--tail", str(tail), service,
         cwd=str(REPO_ROOT),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,

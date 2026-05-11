@@ -1,5 +1,6 @@
 PYTHON := $(shell test -x .venv/bin/python && echo .venv/bin/python || echo python3)
 PIP    := $(shell test -x .venv/bin/pip && echo .venv/bin/pip || echo pip)
+COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo "docker compose"; fi)
 
 .PHONY: start tui up down restart logs ps test test-unit test-integration dump release install venv help
 .DEFAULT_GOAL := start
@@ -7,8 +8,8 @@ PIP    := $(shell test -x .venv/bin/pip && echo .venv/bin/pip || echo pip)
 # ──────────────── основной воркфлоу ────────────────
 
 start: .venv/bin/python ## restart всего стека и открыть TUI (default)
-	@docker compose down --remove-orphans 2>&1 | grep -E '(Removed|Removing)' || true
-	@docker compose up -d --build 2>&1 | grep -E '(Started|Built|Healthy|Error)' || true
+	@$(COMPOSE) down --remove-orphans 2>&1 | grep -E '(Removed|Removing)' || true
+	@$(COMPOSE) up -d --build 2>&1 | grep -E '(Started|Built|Healthy|Error)' || true
 	@.venv/bin/python -m devops.app
 
 tui: .venv/bin/python ## только TUI без передёргивания контейнеров
@@ -30,40 +31,40 @@ install: ## pip install -e ".[dev]" в текущий python
 # ──────────────── docker-compose ────────────────
 
 up: ## docker compose up -d --build
-	docker compose up -d --build
+	$(COMPOSE) up -d --build
 
 down: ## docker compose down
-	docker compose down
+	$(COMPOSE) down
 
 restart: ## docker compose restart
-	docker compose restart
+	$(COMPOSE) restart
 
 ps: ## docker compose ps
-	docker compose ps
+	$(COMPOSE) ps
 
 logs: ## live-логи всего стека
-	docker compose logs -f
+	$(COMPOSE) logs -f
 
 logs-bot: ## логи bot
-	docker compose logs -f bot
+	$(COMPOSE) logs -f bot
 
 logs-parser: ## логи parser
-	docker compose logs -f parser
+	$(COMPOSE) logs -f parser
 
 logs-api: ## логи api
-	docker compose logs -f api
+	$(COMPOSE) logs -f api
 
 # ──────────────── тесты ────────────────
 
 test: ## все тесты
-	@docker compose up -d postgres >/dev/null 2>&1
+	@$(COMPOSE) up -d postgres >/dev/null 2>&1
 	@POSTGRES_TEST_HOST=localhost POSTGRES_TEST_PORT=5433 $(PYTHON) -m pytest -v
 
 test-unit: ## юнит без БД
 	$(PYTHON) -m pytest tests/unit -v
 
 test-integration: ## integration с postgres
-	@docker compose up -d postgres >/dev/null 2>&1
+	@$(COMPOSE) up -d postgres >/dev/null 2>&1
 	@POSTGRES_TEST_HOST=localhost POSTGRES_TEST_PORT=5433 $(PYTHON) -m pytest tests/integration -v
 
 # ──────────────── seed-дампы ────────────────
