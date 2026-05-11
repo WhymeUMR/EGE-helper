@@ -175,19 +175,36 @@ async def stream_logs(service: str, tail: int = 80) -> AsyncIterator[str]:
     Прерывание делаем через CancelledError на стороне вызывающего: когда
     юзер переключает сервис, отменяем итератор и subprocess получает SIGTERM.
     """
-    global _COMPOSE_CMD
-    if _COMPOSE_CMD is None:
-        if shutil.which("docker-compose"):
-            _COMPOSE_CMD = ("docker-compose",)
-        else:
-            _COMPOSE_CMD = ("docker", "compose")
+    code, out, _ = await _compose("ps", "-q", service)
+    container_id = out.strip() if code == 0 else ""
 
-    proc = await asyncio.create_subprocess_exec(
-        *_COMPOSE_CMD, "logs", "--no-color", "-f", "--tail", str(tail), service,
-        cwd=str(REPO_ROOT),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-    )
+    # Prefer `docker logs` for compatibility with legacy docker-compose (v1),
+    # whose internal log_printer may crash on watch_events.
+    if container_id:
+        proc = await asyncio.create_subprocess_exec(
+            "docker",
+            "logs",
+            "-f",
+            "--tail",
+            str(tail),
+            container_id,
+            cwd=str(REPO_ROOT),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+    else:
+        global _COMPOSE_CMD
+        if _COMPOSE_CMD is None:
+            if shutil.which("docker-compose"):
+                _COMPOSE_CMD = ("docker-compose",)
+            else:
+                _COMPOSE_CMD = ("docker", "compose")
+        proc = await asyncio.create_subprocess_exec(
+            *_COMPOSE_CMD, "logs", "--no-color", "-f", "--tail", str(tail), service,
+            cwd=str(REPO_ROOT),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
     assert proc.stdout is not None
     try:
         while True:
