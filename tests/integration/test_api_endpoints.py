@@ -179,16 +179,18 @@ async def test_auth_blocks_when_token_set(session, api_client, monkeypatch):
 
     monkeypatch.setattr(settings, "api_token", "secret123")
 
-    no_token = await api_client.get("/api/v1/subjects")
+    # legacy api_token защищает только старые роуты под legacy_router
+    # (/topics, /problems). Новые роуты используют JWT через get_current_user.
+    no_token = await api_client.get("/api/v1/topics?subject=math")
     assert no_token.status_code == 401
 
     wrong = await api_client.get(
-        "/api/v1/subjects", headers={"Authorization": "Bearer wrong"}
+        "/api/v1/topics?subject=math", headers={"Authorization": "Bearer wrong"}
     )
     assert wrong.status_code == 401
 
     ok = await api_client.get(
-        "/api/v1/subjects", headers={"Authorization": "Bearer secret123"}
+        "/api/v1/topics?subject=math", headers={"Authorization": "Bearer secret123"}
     )
     assert ok.status_code == 200
 

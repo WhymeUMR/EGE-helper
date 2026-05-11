@@ -20,21 +20,6 @@ from bot.catalog import SUBJECT_LABELS
 router = APIRouter(prefix="/api/v1", dependencies=[Depends(require_token)])
 
 
-@router.get("/subjects", response_model=list[SubjectInfo], tags=["meta"])
-async def list_subjects(session: AsyncSession = Depends(get_session)) -> list[SubjectInfo]:
-    """Все предметы в БД с количеством задач и номеров."""
-    rows = await repo.list_subjects_with_stats(session)
-    return [
-        SubjectInfo(
-            key=r["subject"],
-            label=SUBJECT_LABELS.get(r["subject"], r["subject"]),
-            problems_count=r["problems"],
-            topics_count=r["topics"],
-        )
-        for r in rows
-    ]
-
-
 @router.get("/topics", response_model=list[TopicInfo], tags=["meta"])
 async def list_topics(
     subject: str = Query(..., description="ключ предмета: math, russian, ..."),
