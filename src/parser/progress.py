@@ -109,10 +109,12 @@ class ParserUI:
 
     def end_subject(self) -> None:
         if self.subject_task_id != -1:
-            self.subject_progress.update(
-                self.subject_task_id,
-                completed=self.subject_progress.tasks[self.subject_task_id].total,
-            )
+            task = self.subject_progress._tasks.get(self.subject_task_id)
+            if task is not None:
+                self.subject_progress.update(
+                    self.subject_task_id,
+                    completed=task.total,
+                )
         self.overall_progress.advance(self.overall_task_id)
         self._refresh()
 
@@ -133,6 +135,11 @@ class ParserUI:
         self._tick()
 
     def _tick(self) -> None:
+        if self.subject_task_id == -1:
+            return
+        task = self.subject_progress._tasks.get(self.subject_task_id)
+        if task is None:
+            return
         self.subject_progress.update(
             self.subject_task_id,
             advance=1,
